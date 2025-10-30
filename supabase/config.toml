@@ -1,0 +1,7 @@
+project_id = "oqozpfoatthbcbznxxfw"
+
+[auth]
+enabled = true
+
+[functions.detect-plant-disease]
+verify_jwt = false

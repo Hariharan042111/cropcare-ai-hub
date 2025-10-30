@@ -15,6 +15,19 @@ const DiseaseDetection = () => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Please upload only image files (JPG, PNG, or WEBP)");
+        return;
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Image size must be less than 10MB");
+        return;
+      }
+
       setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -26,36 +39,75 @@ const DiseaseDetection = () => {
   };
 
   const handleDetection = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !preview) return;
 
     setDetecting(true);
 
-    // Simulate AI detection
-    setTimeout(() => {
+    try {
+      // Call the backend AI detection
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/detect-plant-disease`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ imageData: preview }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to analyze image");
+      }
+
+      const data = await response.json();
+
+      // Check if it's a valid plant image
+      if (!data.isPlantImage) {
+        toast.error(data.error || "Please upload an image of a plant or leaf");
+        setDetecting(false);
+        return;
+      }
+
+      // Check if disease was detected
+      if (!data.diseaseDetected) {
+        toast.success(data.message || "Plant appears healthy!");
+        setResult({
+          disease: "No Disease Detected",
+          confidence: 100,
+          causes: [],
+          symptoms: [],
+          treatment: {
+            pesticide: "No treatment needed",
+            application: "Continue regular care",
+            preventive: "Monitor plant regularly for any changes",
+          },
+        });
+        setDetecting(false);
+        return;
+      }
+
+      // Format the result for display
       setResult({
-        disease: "Tomato Late Blight",
-        confidence: 94.5,
-        causes: [
-          "High humidity and moisture",
-          "Cool temperatures (60-70°F)",
-          "Poor air circulation",
-          "Infected plant material nearby",
-        ],
-        symptoms: [
-          "Dark brown spots on leaves",
-          "White fungal growth on leaf undersides",
-          "Rapid leaf death and decay",
-          "Fruit rot with dark lesions",
-        ],
+        disease: data.diseaseName,
+        confidence: data.confidence,
+        causes: data.causes || [],
+        symptoms: data.symptoms || [],
         treatment: {
-          pesticide: "Copper-based fungicide (Ridomil Gold)",
-          application: "Apply every 7-10 days, especially after rain",
-          preventive: "Remove infected plants, improve air circulation, avoid overhead watering",
+          pesticide: data.treatment?.pesticides?.join(", ") || "Consult agricultural expert",
+          application: data.treatment?.description || "",
+          preventive: data.treatment?.organicAlternatives?.join(", ") || "",
         },
       });
-      setDetecting(false);
+      
       toast.success("Disease detected successfully!");
-    }, 2500);
+    } catch (error) {
+      console.error("Detection error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to analyze image. Please try again.");
+    } finally {
+      setDetecting(false);
+    }
   };
 
   const handleSendToDoctor = () => {
@@ -99,7 +151,7 @@ const DiseaseDetection = () => {
                 <input
                   type="file"
                   className="hidden"
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
                   onChange={handleFileSelect}
                 />
               </label>
