@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Leaf, Upload, FileText, ArrowLeft, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 const DiseaseDetection = () => {
   const navigate = useNavigate();
@@ -113,6 +114,95 @@ const DiseaseDetection = () => {
   const handleSendToDoctor = () => {
     toast.success("Report sent to doctor for review");
     navigate("/consultation");
+  };
+
+  const handleDownloadReport = () => {
+    if (!result) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPosition = 20;
+
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(34, 197, 94); // primary green
+    doc.text("Plant Disease Detection Report", pageWidth / 2, yPosition, { align: "center" });
+    
+    yPosition += 15;
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: "center" });
+
+    // Detection Results
+    yPosition += 15;
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Detection Results", 20, yPosition);
+    
+    yPosition += 10;
+    doc.setFontSize(12);
+    doc.text(`Disease: ${result.disease}`, 20, yPosition);
+    
+    yPosition += 8;
+    doc.text(`Confidence: ${result.confidence}%`, 20, yPosition);
+
+    // Causes
+    if (result.causes && result.causes.length > 0) {
+      yPosition += 15;
+      doc.setFontSize(14);
+      doc.text("Causes", 20, yPosition);
+      
+      yPosition += 8;
+      doc.setFontSize(11);
+      result.causes.forEach((cause: string) => {
+        const lines = doc.splitTextToSize(`• ${cause}`, pageWidth - 40);
+        doc.text(lines, 25, yPosition);
+        yPosition += lines.length * 6;
+      });
+    }
+
+    // Symptoms
+    if (result.symptoms && result.symptoms.length > 0) {
+      yPosition += 10;
+      doc.setFontSize(14);
+      doc.text("Symptoms", 20, yPosition);
+      
+      yPosition += 8;
+      doc.setFontSize(11);
+      result.symptoms.forEach((symptom: string) => {
+        const lines = doc.splitTextToSize(`• ${symptom}`, pageWidth - 40);
+        doc.text(lines, 25, yPosition);
+        yPosition += lines.length * 6;
+      });
+    }
+
+    // Treatment
+    yPosition += 10;
+    doc.setFontSize(14);
+    doc.text("Recommended Treatment", 20, yPosition);
+    
+    yPosition += 8;
+    doc.setFontSize(11);
+    doc.text("Pesticide:", 20, yPosition);
+    yPosition += 6;
+    const pesticideLines = doc.splitTextToSize(result.treatment.pesticide, pageWidth - 40);
+    doc.text(pesticideLines, 25, yPosition);
+    yPosition += pesticideLines.length * 6 + 5;
+
+    doc.text("Application:", 20, yPosition);
+    yPosition += 6;
+    const applicationLines = doc.splitTextToSize(result.treatment.application, pageWidth - 40);
+    doc.text(applicationLines, 25, yPosition);
+    yPosition += applicationLines.length * 6 + 5;
+
+    doc.text("Prevention:", 20, yPosition);
+    yPosition += 6;
+    const preventiveLines = doc.splitTextToSize(result.treatment.preventive, pageWidth - 40);
+    doc.text(preventiveLines, 25, yPosition);
+
+    // Save PDF
+    doc.save(`plant-disease-report-${Date.now()}.pdf`);
+    toast.success("Report downloaded successfully");
   };
 
   return (
@@ -256,7 +346,7 @@ const DiseaseDetection = () => {
 
             {/* Action Buttons */}
             <div className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={() => toast.success("Report downloaded")}>
+              <Button variant="outline" className="flex-1" onClick={handleDownloadReport}>
                 <FileText className="h-5 w-5 mr-2" />
                 Download Report
               </Button>
